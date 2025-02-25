@@ -53,6 +53,9 @@ def update_nickname(nickname: str, server_id: int):
 
                 logging.info(f"Rate limited by Discord. Waiting {rate_limit} seconds before trying again.")
                 time.sleep(rate_limit)
+            elif result.status_code == 403:
+                logging.error(f"Dont have permission to change nickname in this server: {server_id}")
+                exit(1)
         except Exception as e:
             logging.error(e)
 
