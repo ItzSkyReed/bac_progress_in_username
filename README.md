@@ -7,7 +7,7 @@ and yes, you will need a token
 1. Install [Python](https://www.python.org/downloads/) if you dont have it yet
 2. Download this repo as zip (and unzip) OR download main.py file
 3. Modify some values in main.py file:
-- delay - cooldown between progress checks and nickname updating
+- delay - cooldown between each nickname update
 - servers - a list of server ids of all servers where you want your nickname to be changed
 - get_nickname - this is what your nickname will look like (except get_adv_progress(...) will be replaced with your adv progress)<br>
 you can use multiple get_adv_progress! all of them must be inside {} (dont put two of them in one {}, separate them)
