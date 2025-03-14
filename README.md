@@ -5,24 +5,26 @@ and yes, you will need a token
 
 # Usage
 1. Install [Python](https://www.python.org/downloads/) if you dont have it yet
-2. Download this repo as zip (and unzip) OR download main.py file
-3. Modify some values in main.py file:
-- delay - cooldown between each nickname update
-- servers - a list of server ids of all servers where you want your nickname to be changed
-- get_nickname - this is what your nickname will look like (except get_adv_progress(...) will be replaced with your adv progress)<br>
-you can use multiple get_adv_progress! all of them must be inside {} (dont put two of them in one {}, separate them)
-- token - your discord token.
-- world_folder - full path to your world folder. DO NOT use backslash (\). either use normal slash / or have all double backslashes \\
-4. you can now run this python program. `python main.py` in console will work. for those who dont even know what console is: double clicking might work, or google how to open console
-5. `Ctrl + c` when you want to stop the program.
+2. Download this repo as zip (and unzip) OR `git clone` it
+3. install missing libraries: `pip install -r requirements.txt`
+4. Run `main.py` for the first time: `python3 main.py`
+5. Set up `config.json` after generating
+   - `delay` - cooldown between each nickname update
+   - `servers` a list of server ids of all servers where you want your nickname to be changed
+   - `world_folder`: full path to your world folder. DO NOT use backslash (\). either use normal slash / or have all double backslashes \\
+   - `nickname`: your nickname without "[progress/total]" etc.
+   - `total_advancements`: total amount of advancement (1152 is for BACAP 1.18.1)
+   - `progress_pattern` REGEX pattern that will be used to update your nickname, default one is `<NAME> [<COMPLETED_ADV>/<TOTAL_ADV>]`, it will look something like this: `SuperName [611/1152]`
+6. Set up `TOKEN` in the `.env` file
+7. Run `main.py` again, if you do everything correctly, it will work
+8. `Ctrl + c` when you want to stop the program.
 
 # How to find Discord token?
-- Open discord in web browser or desktop client.
-- Open dev tools (ctrl + shift + i)
-- open network tab
-- Open any channel in any server.
-- Find something like `messages?limit=50` request.
-- Click it and find Authorization in Request Headers
-- Copy this token and use it.
+1. Open discord in web browser or desktop client.
+2. Open dev tools (ctrl + shift + i)
+3. open `Network` tab
+4. Find `science` request
+5. Find `Authorization` in the `Headers` section, this will be your token
+6. Copy this token and use it.
 
-# IF YOU LEAK YOUR TOKEN OR SOMETHING IMMEDIATELY LOG OUT OF THAT BROWSER/APP WHERE YOU GOT YOUR TOKEN FROM
+# IF YOU LEAK YOUR TOKEN OR SOMETHING, IMMEDIATELY LOG OUT OF THAT BROWSER/APP WHERE YOU GOT YOUR TOKEN FROM
