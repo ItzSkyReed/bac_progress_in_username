@@ -6,10 +6,8 @@ import json
 from dataclasses import dataclass, asdict
 from pathlib import Path
 import requests
-
 from dotenv import load_dotenv
 
-config = None
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] (%(levelname)s) %(name)s: %(message)s")
 
 DEFAULT_PATH = "config.json"
