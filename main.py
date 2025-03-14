@@ -1,113 +1,182 @@
 import os
+import re
 import time
 import logging
 import json
+from dataclasses import dataclass, asdict
+from pathlib import Path
 import requests
 
-logging.basicConfig(level = logging.INFO, format = "[%(asctime)s] (%(levelname)s) %(name)s: %(message)s")
+from dotenv import load_dotenv
 
-# delay in seconds
-delay = 5 * 60
+config = None
+logging.basicConfig(level=logging.INFO, format="[%(asctime)s] (%(levelname)s) %(name)s: %(message)s")
 
-# server ids, where you want to change your username
-servers = [419383460600348673]
+DEFAULT_PATH = "config.json"
 
-# your nickname
-# CHANGE THIS
-# get_adv_progress function (INSIDE CURLY BRACES BECAUSE ITS AN F-STRING) needs advancement id and it will return the number of completed criteria
-# fill advancement totals yourself
-get_nickname = lambda: f"Name [{get_adv_progress('blazeandcave:bacap/advancement_legend')}/idk]"
+@dataclass
+class Config:
+    delay: int = 300 # Delay between server updates
+    servers: list = None # Server ids where nickname will be changed
+    world_folder: str = "/path/to/world_folder"
+    nickname: str = "DEFAULT_NAME"  # Your nickname without [progress]
+    total_advancements: int = 1152 # Total advancement (as for BACAP 1.18.1)
+    progress_pattern: str = "<NAME> [<COMPLETED_ADV>/<TOTAL_ADV>]" # <NAME>, <COMPLETED_ADV>, <TOTAL_ADV> are placeholders
 
-# YOUR DISCORD TOKEN </3
-token = ""
+    def __post_init__(self):
+        if self.servers is None:
+            self.servers = [419383460600348673]  # Default server
 
-# full path to world folder
-world_folder = "/path/to/world_folder"
+    @classmethod
+    def load(cls, path: str = DEFAULT_PATH):
+        global CONFIG
+        config_path = Path(path)
+        if config_path.exists():
+            with config_path.open(encoding="utf-8") as f:
+                data = json.load(f)
+            return cls(**data)
+        else:
+            logging.info("No config file found, creating default config...")
+            CONFIG = cls()
+            CONFIG.save()
+            return CONFIG
 
-if not os.path.isdir(world_folder):
-    print("bruh")
-    exit(1)
+    def save(self, path: str = DEFAULT_PATH):
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(asdict(self), f, indent=4)
 
-api_url = "https://discord.com/api/v10"
+TOKEN = None
+
+
+
+def extract_token():
+    global TOKEN
+    load_dotenv()
+    TOKEN = os.getenv("TOKEN")
+
+
+def format_progress(template, name, completed, total):
+    pattern = r"<NAME>|<COMPLETED_ADV>|<TOTAL_ADV>"
+
+    def replacer(match):
+        if match.group() == "<NAME>":
+            return name
+        elif match.group() == "<COMPLETED_ADV>":
+            return str(completed)
+        elif match.group() == "<TOTAL_ADV>":
+            return str(total)
+        return match.group()
+
+    return re.sub(pattern, replacer, template)
+
 
 def update_nickname(nickname: str, server_id: int):
     tries = 0
     while True:
         try:
             result = requests.patch(
-                url = api_url + f"/guilds/{server_id}/members/@me",
-                json = {"nick": nickname},
-                headers = {"Authorization": token}
+                url=f"https://discord.com/api/v10/guilds/{server_id}/members/@me",
+                json={"nick": nickname},
+                headers={"Authorization": TOKEN}
             )
 
             if result.status_code == 200:
-                # success code
+                logging.info(f"Nickname successfully updated: {nickname}")
                 return
+
             elif result.status_code == 401:
                 # Unauthorized status code
-                logging.error("Invalid token!")
+                logging.fatal("Invalid (Unauthorized) discord token!")
                 exit(1)
+
             elif result.status_code == 429:
                 # rate limit status code
-                rate_limit = result.headers["Retry-After"]
-
-                logging.info(f"Rate limited by Discord. Waiting {rate_limit} seconds before trying again.")
+                rate_limit = float(result.headers["Retry-After"])
+                logging.warning(f"Rate limited by Discord. Waiting {rate_limit} seconds before trying again.")
                 time.sleep(rate_limit)
+
             elif result.status_code == 403:
-                logging.error(f"Dont have permission to change nickname in this server: {server_id}")
+                logging.fatal(f"Dont have permission to change nickname in this server: {server_id}")
                 exit(1)
+
         except Exception as e:
             logging.error(e)
 
             tries += 1
 
-            if(tries >= 10):
-                logging.info("Failed api call 10 times. QUITTING")
+            if tries >= 10:
+                logging.error("Failed api call 10 times. QUITTING")
                 exit(1)
 
 
-def get_adv_progress(id: str) -> int:
-    try:
-        # grab any advancement file. non solo and non coop players wouldn't use this script
-        filename = list(filter(lambda x: x.endswith(".json"), os.listdir(os.path.join(world_folder, "advancements"))))[0]
-    except IndexError:
+def get_adv_progress(adv_name: str = "blazeandcave:bacap/advancement_legend") -> int:
+    advancements_path = Path(CONFIG.world_folder) / "advancements"
+    json_files = list(advancements_path.glob("*.json"))
+
+    if not json_files:
         logging.error("Empty advancements folder!")
-        return 0 # no progress
-    
+        return 0  # No progress
+
+    filename = json_files[0]  # Take any JSON file
+
     while True:
         try:
-            with open(os.path.join(world_folder, "advancements", filename), "r") as f:
-                j = json.load(f)
-            break
-        except IOError:
-            # couldn't open file = its open by minecraft (autosave is happenning)
-            logging.warning("Couldn't open advancement file, trying again in 3 seconds...")
+            with filename.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+            break  # Successfully loaded
+        except (IOError, json.JSONDecodeError) as e:
+            logging.warning(f"Couldn't open advancement file ({e}), retrying in 3 seconds...")
             time.sleep(3)
 
-    return len(j[id]["criteria"].keys())
+    logging.info(f"Advancement file {filename} loaded.")
+
+    return len(data.get(adv_name, {}).get("criteria", {}))
 
 
 def main():
-    last_username = None
+
+    extract_token()
+    if TOKEN == "<INSERT_TOKEN_HERE>" or TOKEN is None:
+        logging.fatal("No token provided!")
+        exit(1)
+
+    if not Path(CONFIG.world_folder).exists():
+        logging.fatal("World folder doesn't exist!")
+        exit(1)
+
+    if CONFIG.nickname == "DEFAULT_NAME":
+        logging.fatal("Set up your nickname in the config!")
+        exit(1)
+
+    old_name = None
 
     while True:
-        nick = get_nickname()
+        final_name = format_progress(CONFIG.progress_pattern, CONFIG.nickname, get_adv_progress(), CONFIG.total_advancements)
 
-        if(last_username != nick):
-            for server in servers:
-                update_nickname(get_nickname(), server)
-            last_username = nick
-        
-            logging.info("Updated your nickname, sleeping...")
+        if old_name == final_name:
+            logging.info("Nothing changed since previous check")
+
         else:
-            logging.info("Didn't change the nickname, sleeping...")
+            logging.info("Trying to updated discord nickname")
+            for server in CONFIG.servers:
+                logging.info(f"Updating on server {server}...")
+                update_nickname(final_name, server)
 
-        time.sleep(delay)
+        logging.info(f"Sleeping for {CONFIG.delay} seconds...")
+
+        time.sleep(CONFIG.delay)
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("Bye! Have a great day!!!")
+    CONFIG = Config.load()
 
+    if not Path(".env").exists():
+        logging.info("No .env file found, creating one...")
+        with open(".env", "w") as env:
+            env.write("TOKEN=<INSERT_TOKEN_HERE>\n")
+
+    try:
+        logging.info("Starting main process...")
+        main()
+    finally:
+        print("Bye! Have a great day!!!")
