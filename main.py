@@ -27,7 +27,6 @@ class Config:
 
     @classmethod
     def load(cls, path: str = DEFAULT_PATH):
-        global CONFIG
         config_path = Path(path)
         if config_path.exists():
             with config_path.open(encoding="utf-8") as f:
@@ -35,9 +34,9 @@ class Config:
             return cls(**data)
         else:
             logging.info("No config file found, creating default config...")
-            CONFIG = cls()
-            CONFIG.save()
-            return CONFIG
+            cfg = cls()
+            cfg.save()
+            return cfg
 
     def save(self, path: str = DEFAULT_PATH):
         with open(path, "w", encoding="utf-8") as f:
